@@ -83,7 +83,7 @@ func (f *HTTPHandler) rewriteFunc(r *httputil.ProxyRequest) {
 	// Log to JSON file if FPFileLogger is configured
 	needLog := false
 	t := ""
-	if strings.HasPrefix(r.In.URL.Path, "/store") {
+	if strings.Contains(r.In.URL.Path, "androidevent") {
 		needLog = true
 		t = "app"
 	}
