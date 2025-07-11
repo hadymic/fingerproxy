@@ -85,7 +85,8 @@ func (f *HTTPHandler) rewriteFunc(r *httputil.ProxyRequest) {
 		f.FPFileLogger.Log().
 			Fields(fpData).
 			Str("user_agent", r.In.UserAgent()).
-			Int64("timestamp", time.Now().UnixMilli())
+			Int64("timestamp", time.Now().UnixMilli()).
+			Send()
 	}
 }
 

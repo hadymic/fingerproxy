@@ -170,8 +170,8 @@ func initFileLogger(filePath string) (zerolog.Logger, error) {
 		return zerolog.Logger{}, fmt.Errorf("failed to open log file %s: %w", filePath, err)
 	}
 
-	// Create zerolog logger with JSON output
-	logger := zerolog.New(file).With().Timestamp().Logger()
+	// Create zerolog logger with JSON output (without default timestamp since we add custom one)
+	logger := zerolog.New(file)
 	return logger, nil
 }
 
