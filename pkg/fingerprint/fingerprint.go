@@ -46,13 +46,14 @@ func JA4Fingerprint(data *metadata.Metadata) (string, error) {
 // JA4RAWFingerprint is a FingerprintFunc
 func JA4RAWFingerprint(data *metadata.Metadata) (string, error) {
 	fp := &ja4.JA4Fingerprint{}
-	err := fp.UnmarshalBytes(data.ClientHelloRecord, 't') // TODO: identify connection protocol
+	err := fp.UnmarshalOriginalBytes(data.ClientHelloRecord, 't') // TODO: identify connection protocol
 	if err != nil {
 		return "", fmt.Errorf("ja4_raw: %w", err)
 	}
 
-	vlogf("ja4_raw: %s", fp)
-	return fp.ROString(), nil
+	ja4Raw := fp.ROString()
+	vlogf("ja4_raw: %s", ja4Raw)
+	return ja4Raw, nil
 }
 
 // JA3Fingerprint is a FingerprintFunc

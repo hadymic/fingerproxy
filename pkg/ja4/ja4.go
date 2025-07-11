@@ -52,10 +52,21 @@ func (j *JA4Fingerprint) UnmarshalBytes(clientHelloRecord []byte, protocol byte)
 	if err != nil {
 		return fmt.Errorf("cannot parse client hello: %w", err)
 	}
-	return j.Unmarshal(chs, protocol)
+	return j.Unmarshal(chs, protocol, false)
 }
 
-func (j *JA4Fingerprint) Unmarshal(chs *utls.ClientHelloSpec, protocol byte) error {
+func (j *JA4Fingerprint) UnmarshalOriginalBytes(clientHelloRecord []byte, protocol byte) error {
+	chs := &utls.ClientHelloSpec{}
+	// allowBluntMimicry: true
+	// realPSK: false
+	err := chs.FromRaw(clientHelloRecord, true, false)
+	if err != nil {
+		return fmt.Errorf("cannot parse client hello: %w", err)
+	}
+	return j.Unmarshal(chs, protocol, true)
+}
+
+func (j *JA4Fingerprint) Unmarshal(chs *utls.ClientHelloSpec, protocol byte, keepOriginalOrder bool) error {
 	var err error
 
 	// ja4_a
@@ -67,10 +78,10 @@ func (j *JA4Fingerprint) Unmarshal(chs *utls.ClientHelloSpec, protocol byte) err
 	j.unmarshalFirstALPN(chs)
 
 	// ja4_b
-	j.unmarshalCipherSuites(chs, false)
+	j.unmarshalCipherSuites(chs, keepOriginalOrder)
 
 	// ja4_c
-	err = j.unmarshalExtensions(chs, false)
+	err = j.unmarshalExtensions(chs, keepOriginalOrder)
 	if err != nil {
 		return err
 	}

@@ -59,11 +59,24 @@ func (r *echoResponse) fingerprintJA4() error {
 	}
 
 	rd.JA4 = (*ja4Detail)(fp)
-	rd.JA4Raw = fp.ROString()
 	r.JA4 = fp.String()
-	r.JA4Raw = fp.ROString()
 
 	r.logf("ja4: %s", r.JA4)
+	return nil
+}
+
+func (r *echoResponse) fingerprintJA4RO() error {
+	fp := &ja4.JA4Fingerprint{}
+	rd := r.Detail
+	err := fp.UnmarshalOriginalBytes(rd.Metadata.ClientHelloRecord, 't')
+	if err != nil {
+		return err
+	}
+
+	rd.JA4Raw = fp.ROString()
+	r.JA4Raw = fp.ROString()
+
+	r.logf("ja4_ro: %s", r.JA4)
 	return nil
 }
 

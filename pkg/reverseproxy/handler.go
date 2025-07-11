@@ -82,11 +82,14 @@ func (f *HTTPHandler) rewriteFunc(r *httputil.ProxyRequest) {
 
 	// Log to JSON file if FPFileLogger is configured
 	if f.FPFileLogger != nil && len(fpData) > 0 {
-		f.FPFileLogger.Log().
+		event := f.FPFileLogger.Log().
 			Fields(fpData).
 			Str("user_agent", r.In.UserAgent()).
-			Int64("timestamp", time.Now().UnixMilli()).
-			Send()
+			Int64("timestamp", time.Now().UnixMilli())
+		for k, v := range fpData {
+			event = event.Str(k, v)
+		}
+		event.Send()
 	}
 }
 

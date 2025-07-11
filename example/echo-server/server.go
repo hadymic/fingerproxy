@@ -45,6 +45,12 @@ func echoServer(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if err := response.fingerprintJA4RO(); err != nil {
+		logger.Printf(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	response.fingerrpintHTTP2()
 
 	// print detail if -verbose is specified in CLI
