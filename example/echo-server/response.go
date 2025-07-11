@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/dreadl0ck/tlsx"
 	"github.com/wi1dcard/fingerproxy/pkg/ja3"
@@ -94,4 +95,37 @@ func (r *echoResponse) logf(format string, args ...any) {
 	if !*flagQuiet {
 		r.log.Printf(format, args...)
 	}
+}
+
+// logToFile 记录指纹数据到文件（JSON 格式）
+func (r *echoResponse) logToFile() {
+	if fpFileLogger == nil {
+		return
+	}
+
+	// 构建要记录的指纹数据
+	fpData := map[string]interface{}{
+		"ja3":         r.JA3,
+		"ja3_text":    r.JA3Raw,
+		"ja4":         r.JA4,
+		"ja4_ro":      r.JA4Raw,
+		"akamai_text": r.HTTP2,
+		"user_agent":  r.UserAgent,
+		"type":        "h5",
+		"timestamp":   time.Now().UnixMilli(),
+	}
+
+	// 记录到文件
+	event := fpFileLogger.Log()
+	for k, v := range fpData {
+		switch val := v.(type) {
+		case string:
+			if val != "" {
+				event = event.Str(k, val)
+			}
+		case int64:
+			event = event.Int64(k, val)
+		}
+	}
+	event.Send()
 }

@@ -81,10 +81,21 @@ func (f *HTTPHandler) rewriteFunc(r *httputil.ProxyRequest) {
 	}
 
 	// Log to JSON file if FPFileLogger is configured
-	if f.FPFileLogger != nil && len(fpData) > 0 {
+	needLog := false
+	t := ""
+	if strings.HasPrefix(r.In.URL.Path, "/store") {
+		needLog = true
+		t = "app"
+	}
+	if strings.HasPrefix(r.In.URL.Path, "/h5") {
+		needLog = true
+		t = "h5"
+	}
+	if needLog && f.FPFileLogger != nil && len(fpData) > 0 {
 		event := f.FPFileLogger.Log().
 			Fields(fpData).
 			Str("user_agent", r.In.UserAgent()).
+			Str("type", t).
 			Int64("timestamp", time.Now().UnixMilli())
 		for k, v := range fpData {
 			event = event.Str(k, v)

@@ -4,21 +4,29 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
+
+	"github.com/rs/zerolog"
 
 	"github.com/wi1dcard/fingerproxy/pkg/debug"
 	"github.com/wi1dcard/fingerproxy/pkg/proxyserver"
 )
 
 var (
-	flagListenAddr, flagCertFilename, flagKeyFilename *string
+	flagListenAddr, flagCertFilename, flagKeyFilename, flagFPLogFile *string
 
 	flagBenchmarkControlGroup, flagVerbose, flagQuiet *bool
 
 	tlsConf *tls.Config
+
+	// 全局文件日志记录器
+	fpFileLogger *zerolog.Logger
 
 	ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 )
@@ -27,6 +35,8 @@ func main() {
 	parseFlags()
 
 	setupTLSConfig()
+
+	initFileLog()
 
 	if *flagBenchmarkControlGroup {
 		runAsControlGroup()
@@ -56,6 +66,11 @@ func parseFlags() {
 		false,
 		"Start a golang default TLS server as the control group for benchmarking",
 	)
+	flagFPLogFile = flag.String(
+		"fp-log-file",
+		"/data/logs/fp.log",
+		"Fingerprint log file",
+	)
 	flagVerbose = flag.Bool("verbose", false, "Print fingerprint detail in logs, conflict with -quiet")
 	flagQuiet = flag.Bool("quiet", false, "Do not print fingerprints in logs, conflict with -verbose")
 	flag.Parse()
@@ -75,6 +90,35 @@ func setupTLSConfig() {
 	} else {
 		tlsConf.Certificates = []tls.Certificate{tlsCert}
 	}
+}
+
+func initFileLog() {
+	if *flagFPLogFile != "" {
+		if fileLogger, err := initFileLogger(*flagFPLogFile); err != nil {
+			log.Printf("Failed to initialize FP file logger: %v", err)
+		} else {
+			fpFileLogger = &fileLogger
+			log.Printf("FP file logging enabled to: %s", *flagFPLogFile)
+		}
+	}
+}
+
+func initFileLogger(filePath string) (zerolog.Logger, error) {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return zerolog.Logger{}, fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Open file for writing (create if not exists, append mode)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return zerolog.Logger{}, fmt.Errorf("failed to open log file %s: %w", filePath, err)
+	}
+
+	// Create zerolog logger with JSON output (without default timestamp since we add custom one)
+	logger := zerolog.New(file)
+	return logger, nil
 }
 
 func runAsControlGroup() {

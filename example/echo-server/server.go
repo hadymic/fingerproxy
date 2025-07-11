@@ -53,6 +53,9 @@ func echoServer(w http.ResponseWriter, req *http.Request) {
 
 	response.fingerrpintHTTP2()
 
+	// 记录指纹数据到文件
+	response.logToFile()
+
 	// print detail if -verbose is specified in CLI
 	if *flagVerbose {
 		detail, _ := json.Marshal(response.Detail)
@@ -61,6 +64,9 @@ func echoServer(w http.ResponseWriter, req *http.Request) {
 
 	// send HTTP response
 	switch req.URL.Path {
+	case "/h5":
+		w.WriteHeader(http.StatusNoContent) // 204 No Content
+
 	case "/json":
 		w.Header().Set("Content-Type", "application/json")
 		response.Detail = nil
