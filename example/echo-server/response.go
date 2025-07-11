@@ -63,6 +63,17 @@ func (r *echoResponse) fingerprintJA4() error {
 	r.JA4 = fp.String()
 
 	r.logf("ja4: %s", r.JA4)
+
+	fp = &ja4.JA4Fingerprint{}
+	err = fp.UnmarshalOriginalBytes(rd.Metadata.ClientHelloRecord, 't')
+	if err != nil {
+		return err
+	}
+
+	rd.JA4Raw = fp.ROString()
+	r.JA4Raw = fp.ROString()
+
+	r.logf("ja4_ro: %s", r.JA4Raw)
 	return nil
 }
 
