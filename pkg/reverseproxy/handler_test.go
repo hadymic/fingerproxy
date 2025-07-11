@@ -71,6 +71,7 @@ func TestKubernetesLivenessProbe(t *testing.T) {
 type dummyHeaderInjector struct{}
 
 func (i *dummyHeaderInjector) GetHeaderName() string { return "dummy" }
+func (i *dummyHeaderInjector) GetFieldName() string  { return "dummy" }
 func (i *dummyHeaderInjector) GetHeaderValue(req *http.Request) (string, error) {
 	return "dummy-value", nil
 }

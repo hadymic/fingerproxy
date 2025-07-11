@@ -24,7 +24,8 @@ func echoServer(w http.ResponseWriter, req *http.Request) {
 
 	// prepare response
 	response := &echoResponse{
-		log: logger,
+		log:       logger,
+		UserAgent: req.UserAgent(),
 		Detail: &detailResponse{
 			Metadata:  data,
 			UserAgent: req.UserAgent(),

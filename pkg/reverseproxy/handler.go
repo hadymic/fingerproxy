@@ -9,6 +9,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type HTTPHandler struct {
@@ -28,6 +31,9 @@ type HTTPHandler struct {
 	// a HTTP 200 OK instead of forwarding requests, useful for kubernetes
 	// liveness/readiness probes. defaults to nil, which disables this behavior
 	IsProbeRequest func(*http.Request) bool
+
+	// optional, fingerprint filer logger for header injection
+	FPFileLogger *zerolog.Logger
 }
 
 const (
@@ -57,13 +63,29 @@ func (f *HTTPHandler) rewriteFunc(r *httputil.ProxyRequest) {
 		r.Out.Host = r.In.Host
 	}
 
+	// Collect fingerprint data for JSON logging
+	fpData := make(map[string]string)
+
 	for _, hj := range f.HeaderInjectors {
 		k := hj.GetHeaderName()
+		fd := hj.GetFieldName()
 		if v, err := hj.GetHeaderValue(r.In); err != nil {
 			f.logf("get header %s value for %s failed: %s", k, r.In.RemoteAddr, err)
 		} else if v != "" { // skip empty header values
 			r.Out.Header.Set(k, v)
+			// Use fieldName as key for JSON logging
+			if fd != "" {
+				fpData[fd] = v
+			}
 		}
+	}
+
+	// Log to JSON file if FPFileLogger is configured
+	if f.FPFileLogger != nil && len(fpData) > 0 {
+		f.FPFileLogger.Log().
+			Fields(fpData).
+			Str("user_agent", r.In.UserAgent()).
+			Int64("timestamp", time.Now().UnixMilli())
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -11,10 +12,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
 	"github.com/wi1dcard/fingerproxy/pkg/certwatcher"
 	"github.com/wi1dcard/fingerproxy/pkg/debug"
 	fp "github.com/wi1dcard/fingerproxy/pkg/fingerprint"
@@ -61,9 +64,11 @@ func DefaultHeaderInjectors() []reverseproxy.HeaderInjector {
 	}
 
 	return []reverseproxy.HeaderInjector{
-		fp.NewFingerprintHeaderInjector("X-JA3-Fingerprint", fp.JA3Fingerprint),
-		fp.NewFingerprintHeaderInjector("X-JA4-Fingerprint", fp.JA4Fingerprint),
-		fp.NewFingerprintHeaderInjector("X-HTTP2-Fingerprint", h2fp.HTTP2Fingerprint),
+		fp.NewFingerprintHeaderInjector("X-JA3-Fingerprint", "ja3", fp.JA3Fingerprint),
+		fp.NewFingerprintHeaderInjector("X-JA3-RAW-Fingerprint", "ja3_text", fp.JA3RAWFingerprint),
+		fp.NewFingerprintHeaderInjector("X-JA4-Fingerprint", "ja4", fp.JA4Fingerprint),
+		fp.NewFingerprintHeaderInjector("X-JA4-RAW-Fingerprint", "ja4_ro", fp.JA4RAWFingerprint),
+		fp.NewFingerprintHeaderInjector("X-HTTP2-Fingerprint", "akamai_text", h2fp.HTTP2Fingerprint),
 	}
 }
 
@@ -95,6 +100,16 @@ func defaultReverseProxyHTTPHandler(forwardTo *url.URL, headerInjectors []revers
 
 	if *flagEnableKubernetesProbe {
 		handler.IsProbeRequest = reverseproxy.IsKubernetesProbeRequest
+	}
+
+	// Configure JSON logger if specified
+	if *flagFPLogFile != "" {
+		if fileLogger, err := initFileLogger(*flagFPLogFile); err != nil {
+			DefaultLog.Printf("Failed to initialize FP file logger: %v", err)
+		} else {
+			handler.FPFileLogger = &fileLogger
+			DefaultLog.Printf("FP file logging enabled to: %s", *flagFPLogFile)
+		}
 	}
 
 	return handler
@@ -140,6 +155,24 @@ func initFingerprint() {
 	fp.Logger = FingerprintLog
 	fp.VerboseLogs = *flagVerboseLogs
 	fp.RegisterDurationMetric(PrometheusRegistry, parseDurationMetricBuckets(), "")
+}
+
+func initFileLogger(filePath string) (zerolog.Logger, error) {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return zerolog.Logger{}, fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Open file for writing (create if not exists, append mode)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return zerolog.Logger{}, fmt.Errorf("failed to open log file %s: %w", filePath, err)
+	}
+
+	// Create zerolog logger with JSON output
+	logger := zerolog.New(file).With().Timestamp().Logger()
+	return logger, nil
 }
 
 // Run fingerproxy. To customize the fingerprinting algorithms, use "header injectors".

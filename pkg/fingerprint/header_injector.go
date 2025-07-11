@@ -21,14 +21,16 @@ type FingerprintFunc func(*metadata.Metadata) (string, error)
 // FingerprintHeaderInjector implements reverseproxy.HeaderInjector
 type FingerprintHeaderInjector struct {
 	HeaderName                       string
+	FieldName                        string
 	FingerprintFunc                  FingerprintFunc
 	FingerprintDurationSucceedMetric prometheus.Observer
 	FingerprintDurationErrorMetric   prometheus.Observer
 }
 
-func NewFingerprintHeaderInjector(headerName string, fingerprintFunc FingerprintFunc) *FingerprintHeaderInjector {
+func NewFingerprintHeaderInjector(headerName string, fieldName string, fingerprintFunc FingerprintFunc) *FingerprintHeaderInjector {
 	i := &FingerprintHeaderInjector{
 		HeaderName:      headerName,
+		FieldName:       fieldName,
 		FingerprintFunc: fingerprintFunc,
 	}
 
@@ -57,6 +59,10 @@ func RegisterDurationMetric(registry *prometheus.Registry, buckets []float64, pr
 
 func (i *FingerprintHeaderInjector) GetHeaderName() string {
 	return i.HeaderName
+}
+
+func (i *FingerprintHeaderInjector) GetFieldName() string {
+	return i.FieldName
 }
 
 func (i *FingerprintHeaderInjector) GetHeaderValue(req *http.Request) (string, error) {

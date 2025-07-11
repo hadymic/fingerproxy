@@ -32,6 +32,9 @@ var (
 	// misc
 	flagVerboseLogs *bool
 	flagVersion     *bool
+
+	// fingerprint json logging
+	flagFPLogFile *string
 )
 
 func initFlags() {
@@ -123,6 +126,12 @@ func initFlags() {
 		"verbose",
 		envWithDefaultBool("VERBOSE", false),
 		"Enable verbose logs, equivalent to $VERBOSE",
+	)
+
+	flagFPLogFile = flag.String(
+		"fp-log-file",
+		envWithDefault("FP_LOG_FILE", "/data/logs/fp.log"),
+		"fp log file path for header injectors, default /data/logs/fp.log, equivalent to $FP_LOG_FILE",
 	)
 
 	flagVersion = flag.Bool("version", false, "Print version and exit")

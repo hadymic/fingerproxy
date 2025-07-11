@@ -18,6 +18,7 @@ func main() {
 		i := fingerproxy.DefaultHeaderInjectors()
 		i = append(i, fingerprint.NewFingerprintHeaderInjector(
 			"X-My-Fingerprint",
+			"my_fp",
 			SimpleFingerprint,
 		))
 		return i

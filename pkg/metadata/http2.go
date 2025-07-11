@@ -68,28 +68,28 @@ func (f *HTTP2FingerprintingFrames) Marshal(maxPriorityFrames uint) string {
 	if l := len(f.Priorities); uint(l) < maxPriorityFrames {
 		maxPriorityFrames = uint(l)
 	}
-	if maxPriorityFrames == 0 {
-		// If this feature does not exist, the value should be ‘0’.
-		buf.WriteString("0|")
-	} else {
-		for i, p := range f.Priorities[:maxPriorityFrames] {
-			if i != 0 {
-				// Multiple priority frames are concatenated by a comma (,).
-				buf.WriteString(",")
-			}
-			// StreamID:Exclusivity_Bit:Dependant_StreamID:Weight
-			buf.WriteString(fmt.Sprintf("%d:", p.StreamId))
-			if p.Exclusive {
-				buf.WriteString("1:")
-			} else {
-				buf.WriteString("0:")
-			}
-			// "Add one to the value to obtain a weight between 1 and 256."
-			// Quoted from https://httpwg.org/specs/rfc7540.html#PRIORITY
-			buf.WriteString(fmt.Sprintf("%d:%d", p.StreamDep, int(p.Weight)+1))
-		}
-		buf.WriteString("|")
-	}
+	//if maxPriorityFrames == 0 {
+	// If this feature does not exist, the value should be ‘0’.
+	buf.WriteString("0|")
+	//} else {
+	//	for i, p := range f.Priorities[:maxPriorityFrames] {
+	//		if i != 0 {
+	//			// Multiple priority frames are concatenated by a comma (,).
+	//			buf.WriteString(",")
+	//		}
+	//		// StreamID:Exclusivity_Bit:Dependant_StreamID:Weight
+	//		buf.WriteString(fmt.Sprintf("%d:", p.StreamId))
+	//		if p.Exclusive {
+	//			buf.WriteString("1:")
+	//		} else {
+	//			buf.WriteString("0:")
+	//		}
+	//		// "Add one to the value to obtain a weight between 1 and 256."
+	//		// Quoted from https://httpwg.org/specs/rfc7540.html#PRIORITY
+	//		buf.WriteString(fmt.Sprintf("%d:%d", p.StreamDep, int(p.Weight)+1))
+	//	}
+	//	buf.WriteString("|")
+	//}
 
 	// HEADERS frame
 	wrotePseudoHeader := false

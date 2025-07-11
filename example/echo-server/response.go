@@ -11,10 +11,13 @@ import (
 
 // echoResponse is the HTTP response struct of this echo server
 type echoResponse struct {
-	Detail *detailResponse `json:"detail,omitempty"`
-	JA3    string          `json:"ja3"`
-	JA4    string          `json:"ja4"`
-	HTTP2  string          `json:"http2"`
+	Detail    *detailResponse `json:"detail,omitempty"`
+	JA3       string          `json:"ja3"`
+	JA3Raw    string          `json:"ja3_text"`
+	JA4       string          `json:"ja4"`
+	JA4Raw    string          `json:"ja4_ro"`
+	HTTP2     string          `json:"akamai_text"`
+	UserAgent string          `json:"user_agent"`
 
 	log *log.Logger
 }
@@ -25,6 +28,7 @@ type detailResponse struct {
 	JA3       *ja3Detail         `json:"ja3"`
 	JA3Raw    string             `json:"ja3_raw"`
 	JA4       *ja4Detail         `json:"ja4"`
+	JA4Raw    string             `json:"ja4_raw"`
 }
 
 func (r *echoResponse) fingerprintJA3() error {
@@ -40,6 +44,7 @@ func (r *echoResponse) fingerprintJA3() error {
 	rd.JA3 = (*ja3Detail)(fp)
 	rd.JA3Raw = string(ja3Raw)
 	r.JA3 = ja3.BareToDigestHex(ja3Raw)
+	r.JA3Raw = string(ja3Raw)
 
 	r.logf("ja3: %s", r.JA3)
 	return nil
@@ -47,14 +52,16 @@ func (r *echoResponse) fingerprintJA3() error {
 
 func (r *echoResponse) fingerprintJA4() error {
 	fp := &ja4.JA4Fingerprint{}
-
-	err := fp.UnmarshalBytes(r.Detail.Metadata.ClientHelloRecord, 't')
+	rd := r.Detail
+	err := fp.UnmarshalBytes(rd.Metadata.ClientHelloRecord, 't')
 	if err != nil {
 		return err
 	}
 
-	r.Detail.JA4 = (*ja4Detail)(fp)
+	rd.JA4 = (*ja4Detail)(fp)
+	rd.JA4Raw = fp.ROString()
 	r.JA4 = fp.String()
+	r.JA4Raw = fp.ROString()
 
 	r.logf("ja4: %s", r.JA4)
 	return nil

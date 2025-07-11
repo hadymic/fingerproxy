@@ -16,6 +16,7 @@ func main() {
 		i := fingerproxy.DefaultHeaderInjectors()
 		i = append(i, fingerprint.NewFingerprintHeaderInjector(
 			"X-JA3-Raw-Fingerprint",
+			"ja3_r",
 			fpJA3Raw,
 		))
 		return i

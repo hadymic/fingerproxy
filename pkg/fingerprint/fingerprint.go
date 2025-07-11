@@ -43,6 +43,18 @@ func JA4Fingerprint(data *metadata.Metadata) (string, error) {
 	return fp.String(), nil
 }
 
+// JA4RAWFingerprint is a FingerprintFunc
+func JA4RAWFingerprint(data *metadata.Metadata) (string, error) {
+	fp := &ja4.JA4Fingerprint{}
+	err := fp.UnmarshalBytes(data.ClientHelloRecord, 't') // TODO: identify connection protocol
+	if err != nil {
+		return "", fmt.Errorf("ja4_raw: %w", err)
+	}
+
+	vlogf("ja4_raw: %s", fp)
+	return fp.ROString(), nil
+}
+
 // JA3Fingerprint is a FingerprintFunc
 func JA3Fingerprint(data *metadata.Metadata) (string, error) {
 	hellobasic := &tlsx.ClientHelloBasic{}
@@ -52,6 +64,18 @@ func JA3Fingerprint(data *metadata.Metadata) (string, error) {
 
 	fp := ja3.DigestHex(hellobasic)
 	vlogf("ja3: %s", fp)
+	return fp, nil
+}
+
+// JA3RAWFingerprint is a FingerprintFunc
+func JA3RAWFingerprint(data *metadata.Metadata) (string, error) {
+	hellobasic := &tlsx.ClientHelloBasic{}
+	if err := hellobasic.Unmarshal(data.ClientHelloRecord); err != nil {
+		return "", fmt.Errorf("ja3_raw: %w", err)
+	}
+
+	fp := string(ja3.Bare(hellobasic))
+	vlogf("ja3_raw: %s", fp)
 	return fp, nil
 }
 

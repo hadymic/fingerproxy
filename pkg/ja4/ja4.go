@@ -104,6 +104,31 @@ func (j *JA4Fingerprint) String() string {
 	return ja4
 }
 
+func (j *JA4Fingerprint) ROString() string {
+	ja4a := fmt.Sprintf(
+		"%s%s%s%s%s%s",
+		string(j.Protocol),
+		j.TLSVersion,
+		string(j.SNI),
+		j.NumberOfCipherSuites,
+		j.NumberOfExtensions,
+		j.FirstALPN,
+	)
+
+	ja4b := j.CipherSuites.String()
+
+	var ja4c string
+	if len(j.SignatureAlgorithms) == 0 {
+		ja4c = j.Extensions.String()
+	} else {
+		ja4c = fmt.Sprintf("%s_%s", j.Extensions, j.SignatureAlgorithms)
+	}
+
+	ja4 := fmt.Sprintf("%s_%s_%s", ja4a, ja4b, ja4c)
+
+	return ja4
+}
+
 func (j *JA4Fingerprint) unmarshalTLSVersion(chs *utls.ClientHelloSpec) {
 	var vers uint16
 	if chs.TLSVersMax == 0 {

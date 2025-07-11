@@ -20,6 +20,7 @@ func main() {
 		i := fingerproxy.DefaultHeaderInjectors()
 		i = append(i, fingerprint.NewFingerprintHeaderInjector(
 			"X-Sorted-JA3-Fingerprint",
+			"ja3_o",
 			fpSortedJA3,
 		))
 		return i
