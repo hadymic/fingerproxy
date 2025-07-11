@@ -74,6 +74,7 @@ func (r *echoResponse) fingerprintJA4RO() error {
 		return err
 	}
 
+	rd.JA4 = (*ja4Detail)(fp)
 	rd.JA4Raw = fp.ROString()
 	r.JA4Raw = fp.ROString()
 
