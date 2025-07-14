@@ -151,6 +151,48 @@ func defaultTLSConfig(cw *certwatcher.CertWatcher) *tls.Config {
 	}
 }
 
+func dynamicTLSConfig(cw *certwatcher.CertWatcher) *tls.Config {
+	return &tls.Config{
+		// Support all TLS versions, but dynamically choose protocols
+		MinVersion:     tls.VersionTLS10,
+		MaxVersion:     tls.VersionTLS13,
+		GetCertificate: cw.GetCertificate,
+		// Dynamic NextProtos selection based on TLS version
+		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			// Determine supported TLS version from ClientHello
+			config := &tls.Config{
+				MinVersion:     tls.VersionTLS10,
+				MaxVersion:     tls.VersionTLS13,
+				GetCertificate: cw.GetCertificate,
+			}
+
+			// Check if client supports TLS 1.2+ for HTTP/2
+			if hello.SupportedVersions != nil {
+				supportsTLS12Plus := false
+				for _, version := range hello.SupportedVersions {
+					if version >= tls.VersionTLS12 {
+						supportsTLS12Plus = true
+						break
+					}
+				}
+
+				if supportsTLS12Plus {
+					// Modern client: support HTTP/2
+					config.NextProtos = []string{"h2", "http/1.1"}
+				} else {
+					// Legacy client: only HTTP/1.x
+					config.NextProtos = []string{"http/1.1", "http/1.0"}
+				}
+			} else {
+				// If SupportedVersions is nil, assume legacy client
+				config.NextProtos = []string{"http/1.1", "http/1.0"}
+			}
+
+			return config, nil
+		},
+	}
+}
+
 func initFingerprint() {
 	fp.Logger = FingerprintLog
 	fp.VerboseLogs = *flagVerboseLogs
@@ -177,6 +219,12 @@ func initFileLogger(filePath string) (zerolog.Logger, error) {
 
 // Run fingerproxy. To customize the fingerprinting algorithms, use "header injectors".
 // See [fingerproxy.GetHeaderInjectors] for more info.
+//
+// Dynamic protocol support:
+// The server automatically detects client capabilities and supports:
+// - TLS 1.0/1.1 clients: HTTP/1.x only with JA3/JA4 fingerprints
+// - TLS 1.2+ clients: HTTP/2 + HTTP/1.x with JA3/JA4/HTTP2 fingerprints
+// All clients connect to the same port with automatic protocol negotiation.
 func Run() {
 	// CLI
 	initFlags()
@@ -191,14 +239,14 @@ func Run() {
 	// signal cancels context
 	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
-	// main TLS server
+	// main TLS server with dynamic protocol support
 	server := defaultProxyServer(
 		ctx,
 		defaultReverseProxyHTTPHandler(
 			parseForwardURL(),
 			GetHeaderInjectors(),
 		),
-		defaultTLSConfig(cw),
+		dynamicTLSConfig(cw),
 	)
 
 	// start cert watcher
