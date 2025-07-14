@@ -262,6 +262,9 @@ func (j *JA4Fingerprint) unmarshalExtensions(chs *utls.ClientHelloSpec, keepOrig
 
 		l := e.Len()
 		if l == 0 {
+			if keepOriginalOrder {
+				continue
+			}
 			return fmt.Errorf("extension data should not be empty")
 		}
 
