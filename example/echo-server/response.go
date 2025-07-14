@@ -98,7 +98,7 @@ func (r *echoResponse) logf(format string, args ...any) {
 }
 
 // logToFile 记录指纹数据到文件（JSON 格式）
-func (r *echoResponse) logToFile() {
+func (r *echoResponse) logToFile(t string) {
 	if fpFileLogger == nil {
 		return
 	}
@@ -111,7 +111,7 @@ func (r *echoResponse) logToFile() {
 		"ja4_ro":      r.JA4Raw,
 		"akamai_text": r.HTTP2,
 		"user_agent":  r.UserAgent,
-		"type":        "h5",
+		"type":        t,
 		"timestamp":   time.Now().UnixMilli(),
 	}
 

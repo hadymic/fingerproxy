@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/wi1dcard/fingerproxy/pkg/metadata"
 )
@@ -53,13 +54,30 @@ func echoServer(w http.ResponseWriter, req *http.Request) {
 
 	response.fingerrpintHTTP2()
 
+	needLog := false
+	t := ""
+	if strings.Contains(req.URL.Path, "androidevent") {
+		needLog = true
+		t = "app"
+	}
+	if strings.HasPrefix(req.URL.Path, "/h5") {
+		needLog = true
+		t = "h5"
+	}
 	// 记录指纹数据到文件
-	response.logToFile()
+	if needLog {
+		response.logToFile(t)
+	}
 
 	// print detail if -verbose is specified in CLI
 	if *flagVerbose {
 		detail, _ := json.Marshal(response.Detail)
 		logger.Printf("detail: %s", detail)
+	}
+
+	if strings.Contains(req.URL.Path, "androidevent") {
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 
 	// send HTTP response

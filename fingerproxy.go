@@ -226,6 +226,14 @@ func initFileLogger(filePath string) (zerolog.Logger, error) {
 // - TLS 1.2+ clients: HTTP/2 + HTTP/1.x with JA3/JA4/HTTP2 fingerprints
 // All clients connect to the same port with automatic protocol negotiation.
 func Run() {
+	// Enable RSA key exchange for legacy client compatibility
+	// This re-enables RSA key exchange algorithms that were disabled by default in Go 1.22+
+	if err := os.Setenv("GODEBUG", "tlsrsakex=1"); err != nil {
+		DefaultLog.Printf("Warning: failed to set GODEBUG=tlsrsakex=1: %v", err)
+	} else {
+		DefaultLog.Printf("Enabled RSA key exchange for legacy client support (GODEBUG=tlsrsakex=1)")
+	}
+
 	// CLI
 	initFlags()
 	parseFlags()
@@ -246,7 +254,7 @@ func Run() {
 			parseForwardURL(),
 			GetHeaderInjectors(),
 		),
-		dynamicTLSConfig(cw),
+		defaultTLSConfig(cw),
 	)
 
 	// start cert watcher
