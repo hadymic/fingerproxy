@@ -7,19 +7,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/rs/zerolog"
 
 	"github.com/wi1dcard/fingerproxy/pkg/debug"
+	"github.com/wi1dcard/fingerproxy/pkg/logrotate"
 	"github.com/wi1dcard/fingerproxy/pkg/proxyserver"
 )
 
 var (
-	flagListenAddr, flagCertFilename, flagKeyFilename, flagFPLogFile *string
+	flagListenAddr, flagCertFilename, flagKeyFilename, flagFPLogFile, flagStdLogFile *string
 
 	flagBenchmarkControlGroup, flagVerbose, flagQuiet *bool
 
@@ -28,11 +27,17 @@ var (
 	// 全局文件日志记录器
 	fpFileLogger *zerolog.Logger
 
+	// 标准库日志记录器
+	stdLogger *log.Logger
+
 	ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 )
 
 func main() {
 	parseFlags()
+
+	// 初始化标准库日志
+	initStdLog()
 
 	setupTLSConfig()
 
@@ -71,6 +76,11 @@ func parseFlags() {
 		"/data/logs/fp.log",
 		"Fingerprint log file",
 	)
+	flagStdLogFile = flag.String(
+		"std-log-file",
+		"logs/log.log",
+		"standard library log file path, default logs/log.log, equivalent to $STD_LOG_FILE",
+	)
 	flagVerbose = flag.Bool("verbose", false, "Print fingerprint detail in logs, conflict with -quiet")
 	flagQuiet = flag.Bool("quiet", false, "Do not print fingerprints in logs, conflict with -verbose")
 	flag.Parse()
@@ -95,30 +105,44 @@ func setupTLSConfig() {
 func initFileLog() {
 	if *flagFPLogFile != "" {
 		if fileLogger, err := initFileLogger(*flagFPLogFile); err != nil {
-			log.Printf("Failed to initialize FP file logger: %v", err)
+			stdLogger.Printf("Failed to initialize FP file logger: %v", err)
 		} else {
 			fpFileLogger = &fileLogger
-			log.Printf("FP file logging enabled to: %s", *flagFPLogFile)
+			stdLogger.Printf("FP file logging enabled to: %s", *flagFPLogFile)
 		}
 	}
 }
 
 func initFileLogger(filePath string) (zerolog.Logger, error) {
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return zerolog.Logger{}, fmt.Errorf("failed to create directory %s: %w", dir, err)
-	}
+	// Create log configuration with rotation
+	config := logrotate.DefaultZerologConfig(filePath)
 
-	// Open file for writing (create if not exists, append mode)
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// Create zerolog logger with rotation
+	logger, err := logrotate.CreateZerologLogger(config)
 	if err != nil {
-		return zerolog.Logger{}, fmt.Errorf("failed to open log file %s: %w", filePath, err)
+		return zerolog.Logger{}, fmt.Errorf("failed to create rotating logger for %s: %w", filePath, err)
 	}
 
-	// Create zerolog logger with JSON output (without default timestamp since we add custom one)
-	logger := zerolog.New(file)
 	return logger, nil
+}
+
+func initStdLog() {
+	if *flagStdLogFile != "" {
+		// 创建带滚动功能的标准库日志配置
+		config := logrotate.DefaultStandardLogConfig(*flagStdLogFile)
+
+		// 创建支持双输出和滚动的logger
+		logger, err := logrotate.CreateStandardLogger(config, "[echo-server] ", log.LstdFlags)
+		if err != nil {
+			log.Fatalf("Failed to create rotating logger for %s: %v", *flagStdLogFile, err)
+		}
+
+		stdLogger = logger
+		stdLogger.Printf("Standard library logging with rotation enabled to: %s", *flagStdLogFile)
+	} else {
+		stdLogger = log.Default()
+		log.Printf("Standard library logging enabled to default (stdout)")
+	}
 }
 
 func runAsControlGroup() {
@@ -134,7 +158,7 @@ func runAsControlGroup() {
 	}()
 
 	// listen and serve
-	log.Printf("server (benchmark control group) listening on %s", *flagListenAddr)
+	stdLogger.Printf("server (benchmark control group) listening on %s", *flagListenAddr)
 	err := server.ListenAndServeTLS("", "")
 	log.Fatal(err)
 }
@@ -147,7 +171,7 @@ func run() {
 	debug.StartDebugServer()
 
 	// listen and serve
-	log.Printf("server listening on %s", *flagListenAddr)
+	stdLogger.Printf("server listening on %s", *flagListenAddr)
 	err := server.ListenAndServe(*flagListenAddr)
 	log.Fatal(err)
 }

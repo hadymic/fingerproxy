@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +20,7 @@ import (
 	"github.com/wi1dcard/fingerproxy/pkg/certwatcher"
 	"github.com/wi1dcard/fingerproxy/pkg/debug"
 	fp "github.com/wi1dcard/fingerproxy/pkg/fingerprint"
+	"github.com/wi1dcard/fingerproxy/pkg/logrotate"
 	"github.com/wi1dcard/fingerproxy/pkg/proxyserver"
 	"github.com/wi1dcard/fingerproxy/pkg/reverseproxy"
 )
@@ -35,14 +35,15 @@ var (
 
 var (
 	// The loggers used by fingerproxy components
+	// These will be initialized in initLoggers() function
 
-	ProxyServerLog  = log.New(os.Stderr, "[proxyserver] ", logFlags)
-	HTTPServerLog   = log.New(os.Stderr, "[http] ", logFlags)
-	PrometheusLog   = log.New(os.Stderr, "[metrics] ", logFlags)
-	ReverseProxyLog = log.New(os.Stderr, "[reverseproxy] ", logFlags)
-	FingerprintLog  = log.New(os.Stderr, "[fingerprint] ", logFlags)
-	CertWatcherLog  = log.New(os.Stderr, "[certwatcher] ", logFlags)
-	DefaultLog      = log.New(os.Stderr, "[fingerproxy] ", logFlags)
+	ProxyServerLog  *log.Logger
+	HTTPServerLog   *log.Logger
+	PrometheusLog   *log.Logger
+	ReverseProxyLog *log.Logger
+	FingerprintLog  *log.Logger
+	CertWatcherLog  *log.Logger
+	DefaultLog      *log.Logger
 
 	// The Prometheus metric registry used by fingerproxy
 	PrometheusRegistry = prometheus.NewRegistry()
@@ -51,6 +52,51 @@ var (
 	// defaults to [fingerproxy.DefaultHeaderInjectors]
 	GetHeaderInjectors = DefaultHeaderInjectors
 )
+
+// initLoggers initializes all global loggers with file rotation and console output
+func initLoggers() {
+	var err error
+
+	// Use provided file path or default
+	logFile := *flagStdLogFile
+	if logFile == "" {
+		logFile = "logs/log.log"
+	}
+
+	// Create log configuration
+	config := logrotate.DefaultStandardLogConfig(logFile)
+
+	// Initialize all loggers with the same file rotation configuration
+	if ProxyServerLog, err = logrotate.CreateStandardLogger(config, "[proxyserver] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize ProxyServerLog: %v", err)
+	}
+
+	if HTTPServerLog, err = logrotate.CreateStandardLogger(config, "[http] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize HTTPServerLog: %v", err)
+	}
+
+	if PrometheusLog, err = logrotate.CreateStandardLogger(config, "[metrics] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize PrometheusLog: %v", err)
+	}
+
+	if ReverseProxyLog, err = logrotate.CreateStandardLogger(config, "[reverseproxy] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize ReverseProxyLog: %v", err)
+	}
+
+	if FingerprintLog, err = logrotate.CreateStandardLogger(config, "[fingerprint] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize FingerprintLog: %v", err)
+	}
+
+	if CertWatcherLog, err = logrotate.CreateStandardLogger(config, "[certwatcher] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize CertWatcherLog: %v", err)
+	}
+
+	if DefaultLog, err = logrotate.CreateStandardLogger(config, "[fingerproxy] ", logFlags); err != nil {
+		log.Fatalf("Failed to initialize DefaultLog: %v", err)
+	}
+
+	DefaultLog.Printf("Loggers initialized with file rotation: %s", logFile)
+}
 
 // DefaultHeaderInjectors is the default header injector set that injects JA3, JA4,
 // and Akamai HTTP2 fingerprints. Override [fingerproxy.GetHeaderInjectors] to replace
@@ -144,52 +190,10 @@ func initCertWatcher() *certwatcher.CertWatcher {
 
 func defaultTLSConfig(cw *certwatcher.CertWatcher) *tls.Config {
 	return &tls.Config{
-		NextProtos:     []string{"h2", "http/1.1"},
-		MinVersion:     tls.VersionTLS12,
-		MaxVersion:     tls.VersionTLS13,
-		GetCertificate: cw.GetCertificate,
-	}
-}
-
-func dynamicTLSConfig(cw *certwatcher.CertWatcher) *tls.Config {
-	return &tls.Config{
-		// Support all TLS versions, but dynamically choose protocols
+		NextProtos:     []string{"h2", "http/1.1", "http/1.0"},
 		MinVersion:     tls.VersionTLS10,
 		MaxVersion:     tls.VersionTLS13,
 		GetCertificate: cw.GetCertificate,
-		// Dynamic NextProtos selection based on TLS version
-		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-			// Determine supported TLS version from ClientHello
-			config := &tls.Config{
-				MinVersion:     tls.VersionTLS10,
-				MaxVersion:     tls.VersionTLS13,
-				GetCertificate: cw.GetCertificate,
-			}
-
-			// Check if client supports TLS 1.2+ for HTTP/2
-			if hello.SupportedVersions != nil {
-				supportsTLS12Plus := false
-				for _, version := range hello.SupportedVersions {
-					if version >= tls.VersionTLS12 {
-						supportsTLS12Plus = true
-						break
-					}
-				}
-
-				if supportsTLS12Plus {
-					// Modern client: support HTTP/2
-					config.NextProtos = []string{"h2", "http/1.1"}
-				} else {
-					// Legacy client: only HTTP/1.x
-					config.NextProtos = []string{"http/1.1", "http/1.0"}
-				}
-			} else {
-				// If SupportedVersions is nil, assume legacy client
-				config.NextProtos = []string{"http/1.1", "http/1.0"}
-			}
-
-			return config, nil
-		},
 	}
 }
 
@@ -200,20 +204,15 @@ func initFingerprint() {
 }
 
 func initFileLogger(filePath string) (zerolog.Logger, error) {
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return zerolog.Logger{}, fmt.Errorf("failed to create directory %s: %w", dir, err)
-	}
+	// Create log configuration with rotation
+	config := logrotate.DefaultZerologConfig(filePath)
 
-	// Open file for writing (create if not exists, append mode)
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// Create zerolog logger with rotation
+	logger, err := logrotate.CreateZerologLogger(config)
 	if err != nil {
-		return zerolog.Logger{}, fmt.Errorf("failed to open log file %s: %w", filePath, err)
+		return zerolog.Logger{}, fmt.Errorf("failed to create rotating logger for %s: %w", filePath, err)
 	}
 
-	// Create zerolog logger with JSON output (without default timestamp since we add custom one)
-	logger := zerolog.New(file)
 	return logger, nil
 }
 
@@ -226,6 +225,13 @@ func initFileLogger(filePath string) (zerolog.Logger, error) {
 // - TLS 1.2+ clients: HTTP/2 + HTTP/1.x with JA3/JA4/HTTP2 fingerprints
 // All clients connect to the same port with automatic protocol negotiation.
 func Run() {
+	// CLI
+	initFlags()
+	parseFlags()
+
+	// Initialize loggers with rotation after flags are parsed
+	initLoggers()
+
 	// Enable RSA key exchange for legacy client compatibility
 	// This re-enables RSA key exchange algorithms that were disabled by default in Go 1.22+
 	if err := os.Setenv("GODEBUG", "tlsrsakex=1"); err != nil {
@@ -233,10 +239,6 @@ func Run() {
 	} else {
 		DefaultLog.Printf("Enabled RSA key exchange for legacy client support (GODEBUG=tlsrsakex=1)")
 	}
-
-	// CLI
-	initFlags()
-	parseFlags()
 
 	// fingerprint package
 	initFingerprint()

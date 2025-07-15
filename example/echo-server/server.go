@@ -12,8 +12,15 @@ import (
 )
 
 func echoServer(w http.ResponseWriter, req *http.Request) {
-	// create logger for this request, it outputs logs with client IP and port as prefix
-	logger := log.New(os.Stdout, fmt.Sprintf("[client %s] ", req.RemoteAddr), log.LstdFlags|log.Lmsgprefix)
+	// create logger for this request using the same output as stdLogger
+	var logger *log.Logger
+	if stdLogger != nil {
+		// Use the same output writer as stdLogger to ensure logs go to both file and console
+		logger = log.New(stdLogger.Writer(), fmt.Sprintf("[client %s] ", req.RemoteAddr), log.LstdFlags|log.Lmsgprefix)
+	} else {
+		// Fallback to stdout if stdLogger is not initialized
+		logger = log.New(os.Stdout, fmt.Sprintf("[client %s] ", req.RemoteAddr), log.LstdFlags|log.Lmsgprefix)
+	}
 
 	// get metadata from request context
 	data, ok := metadata.FromContext(req.Context())

@@ -35,6 +35,9 @@ var (
 
 	// fingerprint json logging
 	flagFPLogFile *string
+
+	// standard library logging
+	flagStdLogFile *string
 )
 
 func initFlags() {
@@ -132,6 +135,12 @@ func initFlags() {
 		"fp-log-file",
 		envWithDefault("FP_LOG_FILE", "/data/logs/fp.log"),
 		"fp log file path for header injectors, default /data/logs/fp.log, equivalent to $FP_LOG_FILE",
+	)
+
+	flagStdLogFile = flag.String(
+		"std-log-file",
+		envWithDefault("STD_LOG_FILE", "logs/log.log"),
+		"standard library log file path, default logs/log.log, equivalent to $STD_LOG_FILE",
 	)
 
 	flagVersion = flag.Bool("version", false, "Print version and exit")
