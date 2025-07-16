@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 
@@ -39,9 +40,17 @@ func main() {
 	// 初始化标准库日志
 	initStdLog()
 
-	setupTLSConfig()
-
 	initFileLog()
+
+	// Enable RSA key exchange for legacy client compatibility
+	// This re-enables RSA key exchange algorithms that were disabled by default in Go 1.22+
+	if err := os.Setenv("GODEBUG", "tlsrsakex=1"); err != nil {
+		stdLogger.Printf("Warning: failed to set GODEBUG=tlsrsakex=1: %v", err)
+	} else {
+		stdLogger.Printf("Enabled RSA key exchange for legacy client support (GODEBUG=tlsrsakex=1)")
+	}
+
+	setupTLSConfig()
 
 	if *flagBenchmarkControlGroup {
 		runAsControlGroup()
@@ -92,7 +101,9 @@ func parseFlags() {
 
 func setupTLSConfig() {
 	tlsConf = &tls.Config{
-		NextProtos: []string{"h2", "http/1.1"},
+		NextProtos: []string{"h2", "http/1.1", "http/1.0"},
+		MinVersion: tls.VersionTLS10,
+		MaxVersion: tls.VersionTLS13,
 	}
 
 	if tlsCert, err := tls.LoadX509KeyPair(*flagCertFilename, *flagKeyFilename); err != nil {
