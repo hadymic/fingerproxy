@@ -37,8 +37,8 @@ func DefaultStandardLogConfig(filename string) *StandardLogConfig {
 	return &StandardLogConfig{
 		Filename:   filename,
 		MaxSize:    100, // 100MB
-		MaxAge:     3,   // 3 days
-		MaxBackups: 10,  // 10 backup files
+		MaxAge:     30,  // 3 days
+		MaxBackups: 30,  // 10 backup files
 		LocalTime:  true,
 		Compress:   true,
 	}
@@ -49,8 +49,8 @@ func DefaultZerologConfig(filename string) *ZerologConfig {
 	return &ZerologConfig{
 		Filename:   filename,
 		MaxSize:    100, // 100MB
-		MaxAge:     3,   // 3 days
-		MaxBackups: 10,  // 10 backup files
+		MaxAge:     30,  // 3 days
+		MaxBackups: 30,  // 10 backup files
 		LocalTime:  true,
 		Compress:   true,
 	}

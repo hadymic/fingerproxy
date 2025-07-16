@@ -261,24 +261,24 @@ func (j *JA4Fingerprint) unmarshalExtensions(chs *utls.ClientHelloSpec, keepOrig
 		}
 
 		l := e.Len()
+		var extId uint16
 		if l == 0 {
-			if keepOriginalOrder {
-				continue
+			if !keepOriginalOrder {
+				return fmt.Errorf("extension data should not be empty")
 			}
-			return fmt.Errorf("extension data should not be empty")
-		}
+			extId = uint16(0)
+		} else {
+			buf := make([]byte, l)
+			n, err := e.Read(buf)
+			if err != nil && !errors.Is(err, io.EOF) {
+				return fmt.Errorf("failed to read extension: %w", err)
+			}
 
-		buf := make([]byte, l)
-		n, err := e.Read(buf)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return fmt.Errorf("failed to read extension: %w", err)
+			if n < 2 {
+				return fmt.Errorf("extension data is too short, expect more than 2, actual %d", n)
+			}
+			extId = uint16(buf[0])<<8 | uint16(buf[1])
 		}
-
-		if n < 2 {
-			return fmt.Errorf("extension data is too short, expect more than 2, actual %d", n)
-		}
-		extId := uint16(buf[0])<<8 | uint16(buf[1])
-
 		extensions = append(extensions, extId)
 	}
 

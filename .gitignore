@@ -5,6 +5,7 @@
 *.crt
 *.key
 /bin
+/logs
 /example/echo-server/bin
 /fingerproxy
 .pytest_cache
